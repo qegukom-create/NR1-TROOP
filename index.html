@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NR1 - Troop level</title>
+    <title>NR1 - Troop Levels</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
@@ -19,12 +19,21 @@
         .btn-save { background: var(--primary); color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; }
         .btn-action { background: none; border: none; cursor: pointer; font-size: 1.2rem; color: #64748b; }
         input, select { background: #0f172a; border: 2px solid #334155; color: white; padding: 10px; border-radius: 8px; width: 100%; }
+        
+        /* Style du Toast */
+        #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 1; left: 50%; bottom: 30px; transform: translateX(-50%); }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
     </style>
 </head>
 <body>
 
+<div id="toast">
+Qegukom sends you a big kiss !</div>
+
 <div class="container">
-    <h1>NR1 🛡️ MEMBER ROSTER</h1>
+    <h1>NR1 🛡️ TROOP LEVELS</h1>
     <input type="text" id="search-member" placeholder="🔍 Search a member..." oninput="renderList()" style="margin-bottom:20px">
     <div id="memberList"></div>
 </div>
@@ -49,12 +58,17 @@
         renderList();
     });
 
+    function showToast() {
+        const x = document.getElementById("toast");
+        x.className = "show";
+        setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+    }
+
     function renderList() {
         const query = document.getElementById('search-member').value.toLowerCase();
         const display = document.getElementById('memberList');
         display.innerHTML = "";
 
-        // Tri : D'abord ceux qui ont des troupes, puis puissance
         const sorted = [...allMembers].sort((a, b) => {
             const valA = (troopOrder[a.inf]||0) + (troopOrder[a.cav]||0) + (troopOrder[a.arch]||0);
             const valB = (troopOrder[b.inf]||0) + (troopOrder[b.cav]||0) + (troopOrder[b.arch]||0);
@@ -89,6 +103,7 @@
             cav: document.getElementById('ec-'+id).value,
             arch: document.getElementById('ea-'+id).value
         });
+        showToast();
         toggleEdit(id);
     }
     function toggleEdit(id) { document.getElementById('edit-'+id).classList.toggle('active'); }
