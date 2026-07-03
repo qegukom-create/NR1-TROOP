@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NR1 - Troop Leaderboard</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <style>
+        :root { --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --text: #f1f5f9; --warning: #f59e0b; --accent: #10b981; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .main-layout { display: flex; gap: 20px; max-width: 1000px; margin: auto; }
+        .editor-side { flex: 2; }
+        .leaderboard-side { flex: 1; background: var(--card); padding: 15px; border-radius: 12px; height: fit-content; position: sticky; top: 20px; }
+        .rank-item { padding: 8px 0; border-bottom: 1px solid #334155; font-size: 0.9rem; }
+        input, select { background: #0f172a; border: 2px solid #334155; color: white; padding: 10px; border-radius: 8px; width: 100%; box-sizing: border-box; }
+        .member-card { background: var(--card); padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .troop-tag { color: var(--accent); font-weight: bold; }
+        .edit-zone { background: #0f172a; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: none; flex-direction: column; gap: 10px; border: 1px dashed #334155; }
+        .edit-zone.active { display: flex; }
+        .btn-save { background: var(--primary); color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; }
+        .btn-action { background: none; border: none; cursor: pointer; font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+
+<div class="main-layout">
+    <div class="editor-side">
+        <h1>NR1 🛡️ TROOP LEVELS</h1>
+        <input type="text" id="search-member" placeholder="🔍 Search a member..." oninput="renderApp()">
+        <div id="memberList" style="margin-top:20px"></div>
+    </div>
+
+    <div class="leaderboard-side">
+        <h3>🏆 Ranking</h3>
+        <div id="leaderboardList"></div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyA8edMWQreJMKrbS8MuowKZl58x7W5vfBU",
+        authDomain: "nr1-vikings.firebaseapp.com",
+        databaseURL: "https://nr1-vikings-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "nr1-vikings"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const membersRef = db.ref('alliance_database');
+
+    let allMembers = [];
+    const troopOrder = { "T9": 1, "T10": 2, "TG1": 3, "TG2": 4, "TG3": 5 };
+
+    membersRef.on('value', (snap) => {
+        const data = snap.val();
+        allMembers = data ? Object.keys(data).map(id => ({ id, ...data[id] })) : [];
+        renderApp();
+    });
+
+    function renderApp() {
+        renderList();
+        renderLeaderboard();
+    }
+
+    function renderList() {
+        const query = document.getElementById('search-member').value.toLowerCase();
+        const display = document.getElementById('memberList');
+        display.innerHTML = "";
+        allMembers.filter(m => m.name.toLowerCase().includes(query)).forEach(m => {
+            display.innerHTML += `
+                <div class="member-card">
+                    <div><strong>${m.name}</strong><br><span class="troop-tag">⚔️${m.inf||'-'} 🐎${m.cav||'-'} 🏹${m.arch||'-'}</span></div>
+                    <button class="btn-action" onclick="toggleEdit('${m.id}')">✎</button>
+                </div>
+                <div id="edit-${m.id}" class="edit-zone">
+                    <select id="ei-${m.id}"><option value="T9" ${m.inf=='T9'?'selected':''}>Inf T9</option><option value="T10" ${m.inf=='T10'?'selected':''}>Inf T10</option><option value="TG1" ${m.inf=='TG1'?'selected':''}>Inf TG1</option><option value="TG2" ${m.inf=='TG2'?'selected':''}>Inf TG2</option><option value="TG3" ${m.inf=='TG3'?'selected':''}>Inf TG3</option></select>
+                    <select id="ec-${m.id}"><option value="T9" ${m.cav=='T9'?'selected':''}>Cav T9</option><option value="T10" ${m.cav=='T10'?'selected':''}>Cav T10</option><option value="TG1" ${m.cav=='TG1'?'selected':''}>Cav TG1</option><option value="TG2" ${m.cav=='TG2'?'selected':''}>Cav TG2</option><option value="TG3" ${m.cav=='TG3'?'selected':''}>Cav TG3</option></select>
+                    <select id="ea-${m.id}"><option value="T9" ${m.arch=='T9'?'selected':''}>Arch T9</option><option value="T10" ${m.arch=='T10'?'selected':''}>Arch T10</option><option value="TG1" ${m.arch=='TG1'?'selected':''}>Arch TG1</option><option value="TG2" ${m.arch=='TG2'?'selected':''}>Arch TG2</option><option value="TG3" ${m.arch=='TG3'?'selected':''}>Arch TG3</option></select>
+                    <button class="btn-save" onclick="updateMember('${m.id}')">Save</button>
+                </div>
+            `;
+        });
+    }
+
+    function renderLeaderboard() {
+        const display = document.getElementById('leaderboardList');
+        const sorted = [...allMembers].sort((a, b) => {
+            const valA = (troopOrder[a.inf]||0) + (troopOrder[a.cav]||0) + (troopOrder[a.arch]||0);
+            const valB = (troopOrder[b.inf]||0) + (troopOrder[b.cav]||0) + (troopOrder[b.arch]||0);
+            
+            if (valB === valA) {
+                return (b.power || 0) - (a.power || 0);
+            }
+            return valB - valA;
+        });
+        
+        display.innerHTML = sorted.map((m, i) => `
+            <div class="rank-item">${i+1}. <b>${m.name}</b></div>
+        `).join('');
+    }
+
+    function updateMember(id) {
+        membersRef.child(id).update({
+            inf: document.getElementById('ei-'+id).value,
+            cav: document.getElementById('ec-'+id).value,
+            arch: document.getElementById('ea-'+id).value
+        });
+        toggleEdit(id);
+    }
+    function toggleEdit(id) { document.getElementById('edit-'+id).classList.toggle('active'); }
+</script>
+</body>
+</html>
