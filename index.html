@@ -17,40 +17,44 @@
         .edit-zone { background: #0f172a; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: none; flex-direction: column; gap: 10px; border: 1px dashed #334155; }
         .edit-zone.active { display: flex; }
         .btn-save { background: var(--primary); color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; }
+        .btn-view { background: #6366f1; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; width: 100%; margin-bottom: 20px; }
         .btn-action { background: none; border: none; cursor: pointer; font-size: 1.2rem; color: #64748b; }
-        input, select { background: #0f172a; border: 2px solid #334155; color: white; padding: 10px; border-radius: 8px; width: 100%; }
         
-        /* Style du Toast */
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10; overflow-y: auto; padding: 20px; box-sizing: border-box; }
+        .modal-content { max-width: 800px; margin: auto; background: var(--bg); padding: 20px; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .squad-card { background: var(--card); padding: 15px; border-radius: 10px; border: 1px solid #334155; }
+        .squad-card h3 { color: var(--accent); margin-top: 0; }
+        
         #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 1; left: 50%; bottom: 30px; transform: translateX(-50%); }
         #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
         @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
         @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
-    </style> 
+    </style>
 </head>
 <body>
 
-<div id="toast">
-Qegukom sends you a big kiss !</div>
+<div id="toast">Qegukom de fait, fait un bisous !</div>
 
 <div class="container">
     <h1>NR1 🛡️ TROOP LEVELS</h1>
-    <input type="text" id="search-member" placeholder="🔍 Search a member..." oninput="renderList()" style="margin-bottom:20px">
+    <button class="btn-view" onclick="openModal()">View Squad</button>
+    <input type="text" id="search-member" placeholder="🔍 Search a member..." oninput="renderList()" style="margin-bottom:20px; width: 100%; padding: 10px; border-radius: 8px; border: 2px solid #334155; background: #0f172a; color: white;">
     <div id="memberList"></div>
 </div>
 
+<div id="squadModal" class="modal">
+    <div class="modal-content" id="squadGrid"></div>
+    <button style="position:fixed; top:20px; right:20px;" onclick="closeModal()">Close</button>
+</div>
+
 <script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyA8edMWQreJMKrbS8MuowKZl58x7W5vfBU",
-        authDomain: "nr1-vikings.firebaseapp.com",
-        databaseURL: "https://nr1-vikings-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "nr1-vikings"
-    };
+    const firebaseConfig = { apiKey: "AIzaSyA8edMWQreJMKrbS8MuowKZl58x7W5vfBU", authDomain: "nr1-vikings.firebaseapp.com", databaseURL: "https://nr1-vikings-default-rtdb.europe-west1.firebasedatabase.app", projectId: "nr1-vikings" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const membersRef = db.ref('alliance_database');
-
     let allMembers = [];
-    const troopOrder = { "T9": 1, "T10": 2, "TG1": 3, "TG2": 4, "TG3": 5 };
+    const troopOrder = { "": 0, "T9": 1, "T10": 2, "TG1": 3, "TG2": 4, "TG3": 5 };
 
     membersRef.on('value', (snap) => {
         const data = snap.val();
@@ -58,52 +62,76 @@ Qegukom sends you a big kiss !</div>
         renderList();
     });
 
-    function showToast() {
-        const x = document.getElementById("toast");
-        x.className = "show";
-        setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
-    }
-
     function renderList() {
         const query = document.getElementById('search-member').value.toLowerCase();
         const display = document.getElementById('memberList');
         display.innerHTML = "";
-
         const sorted = [...allMembers].sort((a, b) => {
             const valA = (troopOrder[a.inf]||0) + (troopOrder[a.cav]||0) + (troopOrder[a.arch]||0);
             const valB = (troopOrder[b.inf]||0) + (troopOrder[b.cav]||0) + (troopOrder[b.arch]||0);
-            return valB === valA ? (b.power || 0) - (a.power || 0) : valB - valA;
+            return valB - valA;
         });
 
         sorted.filter(m => m.name.toLowerCase().includes(query)).forEach((m, index) => {
             display.innerHTML += `
                 <div class="member-card">
                     <div class="member-info">
+                        <input type="checkbox" ${m.checked ? 'checked' : ''} onchange="toggleCheckbox('${m.id}', this.checked)">
                         <div class="rank-badge">${index + 1}</div>
-                        <div>
-                            <strong>${m.name}</strong><br>
-                            <span class="troop-tag">⚔️${m.inf||'-'} 🐎${m.cav||'-'} 🏹${m.arch||'-'}</span>
-                        </div>
+                        <div><strong>${m.name}</strong><br><span class="troop-tag">⚔️${m.inf||'-'} 🐎${m.cav||'-'} 🏹${m.arch||'-'}</span></div>
                     </div>
                     <button class="btn-action" onclick="toggleEdit('${m.id}')">✎</button>
                 </div>
                 <div id="edit-${m.id}" class="edit-zone">
-                    <select id="ei-${m.id}"><option value="">None</option><option value="T9" ${m.inf=='T9'?'selected':''}>Inf T9</option><option value="T10" ${m.inf=='T10'?'selected':''}>Inf T10</option><option value="TG1" ${m.inf=='TG1'?'selected':''}>Inf TG1</option><option value="TG2" ${m.inf=='TG2'?'selected':''}>Inf TG2</option><option value="TG3" ${m.inf=='TG3'?'selected':''}>Inf TG3</option></select>
-                    <select id="ec-${m.id}"><option value="">None</option><option value="T9" ${m.cav=='T9'?'selected':''}>Cav T9</option><option value="T10" ${m.cav=='T10'?'selected':''}>Cav T10</option><option value="TG1" ${m.cav=='TG1'?'selected':''}>Cav TG1</option><option value="TG2" ${m.cav=='TG2'?'selected':''}>Cav TG2</option><option value="TG3" ${m.cav=='TG3'?'selected':''}>Cav TG3</option></select>
-                    <select id="ea-${m.id}"><option value="">None</option><option value="T9" ${m.arch=='T9'?'selected':''}>Arch T9</option><option value="T10" ${m.arch=='T10'?'selected':''}>Arch T10</option><option value="TG1" ${m.arch=='TG1'?'selected':''}>Arch TG1</option><option value="TG2" ${m.arch=='TG2'?'selected':''}>Arch TG2</option><option value="TG3" ${m.arch=='TG3'?'selected':''}>Arch TG3</option></select>
+                    <select id="ei-${m.id}">${genOpts(m.inf)}</select>
+                    <select id="ec-${m.id}">${genOpts(m.cav)}</select>
+                    <select id="ea-${m.id}">${genOpts(m.arch)}</select>
                     <button class="btn-save" onclick="updateMember('${m.id}')">Save</button>
                 </div>
             `;
         });
     }
 
+    function genOpts(val) {
+        const tiers = ["", "T9", "T10", "TG1", "TG2", "TG3"];
+        return tiers.map(t => `<option value="${t}" ${val==t?'selected':''}>${t||'None'}</option>`).join('');
+    }
+
+    function openModal() {
+        document.getElementById('squadModal').style.display = 'block';
+        const grid = document.getElementById('squadGrid');
+        const categories = { "TG3": [], "TG2": [], "TG1": [], "Txx": [] };
+        
+        allMembers.filter(m => m.checked).forEach(m => {
+            const vInf = troopOrder[m.inf] || 0;
+            const vCav = troopOrder[m.cav] || 0;
+            const vArch = troopOrder[m.arch] || 0;
+            const minTier = Math.min(vInf, vCav, vArch);
+            
+            if (minTier === 5) categories["TG3"].push(m.name);
+            else if (minTier === 4) categories["TG2"].push(m.name);
+            else if (minTier === 3) categories["TG1"].push(m.name);
+            else categories["Txx"].push(m.name);
+        });
+
+        grid.innerHTML = Object.keys(categories).map(cat => `
+            <div class="squad-card">
+                <h3>${cat}</h3>
+                ${categories[cat].map(name => `<div>${name}</div>`).join('')}
+            </div>
+        `).join('');
+    }
+
+    function closeModal() { document.getElementById('squadModal').style.display = 'none'; }
+    function toggleCheckbox(id, isChecked) { membersRef.child(id).update({ checked: isChecked }); }
     function updateMember(id) {
         membersRef.child(id).update({
             inf: document.getElementById('ei-'+id).value,
             cav: document.getElementById('ec-'+id).value,
             arch: document.getElementById('ea-'+id).value
         });
-        showToast();
+        document.getElementById("toast").className = "show";
+        setTimeout(() => document.getElementById("toast").className = "", 3000);
         toggleEdit(id);
     }
     function toggleEdit(id) { document.getElementById('edit-'+id).classList.toggle('active'); }
